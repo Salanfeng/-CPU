@@ -59,6 +59,7 @@
 		wire Jump;
 		wire Link;
 		wire Jr;
+		wire Allstall;
 		wire [4:0] ALUOp;
 
 		//grf
@@ -188,10 +189,12 @@ assign 	OP = ID_Instr[31:26], Funct = ID_Instr[5:0],
 			
 assign offset = ExtOp ? {{16{Imm16[15]}},Imm16} : {16'b0, Imm16};
 assign B_PC = ID_PC + 4 + (offset << 2);
-assign  RD1 	=   FowardAD == 2'b10 ? MEM_ALU_Result :
+assign  RD1 	=   //FowardAD == 2'b11 ? ALU_Result :
+					FowardAD == 2'b10 ? MEM_ALU_Result :
 					FowardAD == 2'b01 ? RegData :
 					NumA;
-wire [31:0] RD2 =   FowardBD == 2'b10 ? MEM_ALU_Result :
+wire [31:0] RD2 =   //FowardBD == 2'b11 ? ALU_Result :
+					FowardBD == 2'b10 ? MEM_ALU_Result :
 					FowardBD == 2'b01 ? RegData :
 					NumB;
 /////CMP/////
@@ -223,6 +226,8 @@ reg EX_Link;
 reg EX_Jr;
 reg [3:0] EX_Tnew;
 reg [4:0] EX_ALUOp;
+
+reg  [1:0] Allstall_Num;
 always @(posedge clk) begin
 if (reset || ID_clr) begin
 	EX_PC <= 32'h00003000;
@@ -245,6 +250,8 @@ if (reset || ID_clr) begin
 	EX_Jr <= 0;
 	EX_Tnew <= 0;
 	EX_ALUOp <= 0;
+
+	Allstall_Num <= 0;
 end
 else begin
 	EX_PC <= ID_PC;
@@ -267,6 +274,10 @@ else begin
 	EX_Jr <= Jr;
 	EX_Tnew <= Tnew > 0 ? Tnew - 1 : 0;
 	EX_ALUOp <= ALUOp;
+
+	Allstall_Num <= Allstall_Num > 0 ? (Allstall_Num - 1) :
+					(OP == 6'b111111) ? 2 : 
+					0;
 end
 end
 
@@ -391,7 +402,8 @@ else begin
 	WB_PC <= MEM_PC;
 	WB_MemOut <= MemOut;
 	WB_ALU_Result <= MEM_ALU_Result;
-	WB_WA <= MEM_WA;
+	WB_WA <= Allstall ? MemOut[4:0] :
+	MEM_WA;
 
 	WB_MemtoReg <= MEM_MemtoReg;
 	WB_RegWrite <= MEM_RegWrite;
@@ -410,8 +422,10 @@ assign GRF_PC = WB_PC;
 
 //////////////////////////////////////////
 //Hazard Control
+assign Allstall = Allstall_Num > 0 ? 1 : 0;
 
 hctrl _hctrl(
+	.Allstall(Allstall),
 	.ID_Rs(Rs),
 	.ID_Rt(Rt),
 	.EX_Rs(EX_Rs),
@@ -419,8 +433,6 @@ hctrl _hctrl(
 	.EX_WA(EX_WA),
 	.MEM_WA(MEM_WA),
 	.WB_WA(WB_WA),
-	.EX_MemtoReg(EX_MemtoReg),
-	.MEM_MemtoReg(MEM_MemtoReg),
 	.EX_RegWrite(EX_RegWrite),
 	.MEM_RegWrite(MEM_RegWrite),
 	.WB_RegWrite(WB_RegWrite),

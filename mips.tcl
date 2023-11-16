@@ -1,2 +1,2 @@
-run 200us;
+run 20us;
 exit

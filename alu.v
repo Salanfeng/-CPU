@@ -53,10 +53,10 @@ always@(*) begin
 	else if (ALUOp == 5'b11111) begin
 		Cnt = 0;
 		Out = 0;
-		for (i = 0;i<32;i=i+1) begin
+		for (i = 0;i<32;i=i+1) begin: for_loop
 			if (Cnt == B) begin
 				Cnt = 0;
-				i = 32;
+				disable for_loop;
 			end
 			else if (A[i] == 0) begin
 				Cnt = Cnt + 1;
