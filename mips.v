@@ -47,6 +47,8 @@
 		wire [1 :0] PCSrc;
 
 		//cu
+		wire [3:0] Tuse_rs,Tuse_rt,Tnew;
+
 		wire RegDst;
 		wire ALUSrc;
 		wire MemtoReg;
@@ -57,7 +59,7 @@
 		wire Jump;
 		wire Link;
 		wire Jr;
-		wire [3:0] ALUOp;
+		wire [4:0] ALUOp;
 
 		//grf
 		wire [31:0] NumA;
@@ -73,6 +75,9 @@
 		wire [4:0] Shift;
 		wire Equal;
 		wire [31:0] ALU_Result;
+
+		reg [3:0] busy;
+
 
 
 		//dm
@@ -161,6 +166,9 @@ assign 	OP = ID_Instr[31:26], Funct = ID_Instr[5:0],
 			.Jump(Jump),
 			.Link(Link),
 			.Jr(Jr),
+			.Tuse_rs(Tuse_rs),
+			.Tuse_rt(Tuse_rt),
+			.Tnew(Tnew),
 			.ALUOp(ALUOp)
 			);
 
@@ -177,21 +185,22 @@ assign 	OP = ID_Instr[31:26], Funct = ID_Instr[5:0],
 			.RD1(NumA), 
 			.RD2(NumB)
 			);
+			
 assign offset = ExtOp ? {{16{Imm16[15]}},Imm16} : {16'b0, Imm16};
 assign B_PC = ID_PC + 4 + (offset << 2);
-assign  RD1 	=   FowardAD == 2'b11 ? ALU_Result :
-					FowardAD == 2'b10 ? MEM_ALU_Result :
+assign  RD1 	=   FowardAD == 2'b10 ? MEM_ALU_Result :
 					FowardAD == 2'b01 ? RegData :
 					NumA;
-wire [31:0] RD2 =   FowardBD == 2'b11 ? ALU_Result :
-					FowardBD == 2'b10 ? MEM_ALU_Result :
+wire [31:0] RD2 =   FowardBD == 2'b10 ? MEM_ALU_Result :
 					FowardBD == 2'b01 ? RegData :
 					NumB;
-assign PCSrc = ((RD1 == RD2) && Branch) ? 1 :
+/////CMP/////
+assign PCSrc = ((RD1 == RD2) && Branch) ? 1 : //Branch
 				Jump ? 2 :
 				Jr ? 3 :
 				0;
 
+assign IF_fluse = 0;
 //////////////////////////////////////////
 //				ID|EX
 reg [31:0] EX_PC;
@@ -212,7 +221,8 @@ reg EX_Branch;
 reg EX_Jump;
 reg EX_Link;
 reg EX_Jr;
-reg [3:0] EX_ALUOp;
+reg [3:0] EX_Tnew;
+reg [4:0] EX_ALUOp;
 always @(posedge clk) begin
 if (reset || ID_clr) begin
 	EX_PC <= 32'h00003000;
@@ -233,6 +243,7 @@ if (reset || ID_clr) begin
 	EX_Jump <= 0;
 	EX_Link <= 0;
 	EX_Jr <= 0;
+	EX_Tnew <= 0;
 	EX_ALUOp <= 0;
 end
 else begin
@@ -254,6 +265,7 @@ else begin
 	EX_Jump <= Jump;
 	EX_Link <= Link;
 	EX_Jr <= Jr;
+	EX_Tnew <= Tnew > 0 ? Tnew - 1 : 0;
 	EX_ALUOp <= ALUOp;
 end
 end
@@ -274,11 +286,18 @@ assign 	Shift = EX_ALUSrc ? 5'h10 : EX_Shamt;
 
 		alu _alu(
 			.ALUOp(EX_ALUOp), 
-			.A(A), 
+			.A(A),
 			.B(B),
 			.Shift(Shift),
 			.ALU_Result(ALU_Result)
 			);
+
+//////////div&mult////////////
+reg [31:0] HI,LO;
+always@(posedge clk) begin
+	if (EX_ALUOp == 0)
+	{HI, LO} <= $signed({HI, LO}) + $signed(A) * $signed(B);
+end
 
 assign EX_WA = 	EX_Link ? 5'h1f : 
 				EX_RegDst ? EX_Rd:
@@ -287,7 +306,7 @@ assign EX_WA = 	EX_Link ? 5'h1f :
 //////////////////////////////////////////
 //				EX|MEM
 reg [31:0] MEM_PC;
-//reg [31:0] MEM_ALU_Result;//放上面
+//reg [31:0] MEM_ALU_Result;
 reg [31:0] MEM_WD;
 reg [4:0] MEM_WA;
 
@@ -297,6 +316,7 @@ reg MEM_MemWrite;
 reg MEM_Jump;
 reg MEM_Link;
 reg MEM_Jr;
+reg [3:0] MEM_Tnew;
 always @(posedge clk) begin
 if (reset) begin
 	MEM_PC <= 32'h00003000;
@@ -310,6 +330,7 @@ if (reset) begin
 	MEM_Jump <= 1'b0;
 	MEM_Link <= 1'b0;
 	MEM_Jr <= 1'b0;
+	MEM_Tnew <= 0;
 end
 else begin
 	MEM_PC <= EX_PC;
@@ -323,6 +344,7 @@ else begin
 	MEM_Jump <= EX_Jump;
 	MEM_Link <= EX_Link;
 	MEM_Jr <= EX_Jr;
+	MEM_Tnew <= EX_Tnew > 0 ? EX_Tnew - 1 : 0;
 end
 end
 
@@ -352,6 +374,7 @@ reg [4:0] WB_WA;
 reg WB_MemtoReg;
 reg WB_RegWrite;
 reg WB_Link;
+reg [3:0] WB_Tnew;
 always @(posedge clk) begin
 if (reset) begin
 	WB_PC <= 32'h00003000;
@@ -362,6 +385,7 @@ if (reset) begin
 	WB_MemtoReg <= 1'b0;
 	WB_RegWrite <= 1'b0;
 	WB_Link <= 1'b0;
+	WB_Tnew <= 0;
 end
 else begin
 	WB_PC <= MEM_PC;
@@ -372,6 +396,7 @@ else begin
 	WB_MemtoReg <= MEM_MemtoReg;
 	WB_RegWrite <= MEM_RegWrite;
 	WB_Link <= MEM_Link;
+	WB_Tnew <= MEM_Tnew > 0 ? MEM_Tnew - 1 : 0;
 end
 end
 
@@ -399,6 +424,11 @@ hctrl _hctrl(
 	.EX_RegWrite(EX_RegWrite),
 	.MEM_RegWrite(MEM_RegWrite),
 	.WB_RegWrite(WB_RegWrite),
+	.Tuse_rs(Tuse_rs),
+	.Tuse_rt(Tuse_rt),
+	.EX_Tnew(EX_Tnew),
+	.MEM_Tnew(MEM_Tnew),
+	.WB_Tnew(WB_Tnew),
 	.npc_stall(npc_stall),
 	.IF_stall(IF_stall),
 	.ID_clr(ID_clr),

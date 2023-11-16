@@ -31,7 +31,10 @@ module cu(
     output Jump,
     output Link,
     output Jr,
-    output [3:0] ALUOp
+	output [3:0] Tuse_rs,
+	output [3:0] Tuse_rt,
+	output [3:0] Tnew,
+    output [4:0] ALUOp
     );
 
 
@@ -52,19 +55,51 @@ assign 	RegDst = (OP == R_type) && (Funct == Add || Funct == Sub || Funct == Sll
 		Jump = (OP == J || OP == Jal),
 		Link = (OP == Jal),
 		Jr = (OP == R_type) && (Funct == Jr_),
-		ALUOp = (OP == R_type && Funct == Add) ? 4'b0000 :
-				(OP == R_type && Funct == Sub) ? 4'b0001 :
-				(OP == Ori) ? 4'b0011 :
-				(OP == Lw) ? 4'b0000 :
-				(OP == Sw) ? 4'b0000 :
-				(OP == Beq) ? 4'b0000 :
-				(OP == Lui) ? 4'b0110 :
-				(OP == J) ? 4'b0000 :
-				(OP == Jal) ? 4'b0000 :
-				(OP == R_type && Funct == Jr_) ? 4'b0000 :
-				(OP == R_type && Funct == Sll) ? 4'b0110 :
-				4'b0000;
+		ALUOp = (OP == R_type && Funct == Add) ? 5'b00000 :
+				(OP == R_type && Funct == Sub) ? 5'b00001 :
+				(OP == Ori) ? 5'b00011 :
+				(OP == Lw) ? 5'b00000 :
+				(OP == Sw) ? 5'b00000 :
+				(OP == Beq) ? 5'b00000 :
+				(OP == Lui) ? 5'b00110 :
+				(OP == J) ? 5'b00000 :
+				(OP == Jal) ? 5'b00000 :
+				(OP == R_type && Funct == Jr_) ? 5'b00000 :
+				(OP == R_type && Funct == Sll) ? 5'b00110 :
+				5'b00000;
 
-	
+localparam TMax = 5'd15,TMin = 5'd0;
+
+assign Tuse_rs =((OP == R_type)&& Funct != Jr_) ? 1: //calc_R
+				(OP == Ori) || (OP == Lui) ? 1: //calc_I
+				(OP == Sll) ? TMax: //shift
+				//(OP == Sllv) ? 1 :
+				(OP == Lw) ? 1: //load
+				(OP == Sw) ? 1: //store
+				(OP == Beq)? 0: //branch
+				(OP == J)||(OP == Jal) ? TMax : //jump
+				(OP == Jr_) ? 0 : //jump
+				TMax;
+assign Tuse_rt = ((OP == R_type)&& Funct != Jr_) ? 1: //calc_R
+				(OP == Ori) || (OP == Lui) ? TMax: //calc_I
+				(OP == Sll) ? 1: //shift
+				//(OP == Sllv) ? 1 :
+				(OP == Lw) ? TMax: //load
+				(OP == Sw) ? 2: //store
+				(OP == Beq)? 0: //branch
+				(OP == J)||(OP == Jal) ? TMax : //jump
+				(OP == Jr_) ? TMax : //jump
+				TMax;
+assign Tnew = 	((OP == R_type)&& Funct != Jr_) ? 2: //calc_R
+				(OP == Ori) || (OP == Lui) ? 2: //calc_I
+				(OP == Sll) ? 2: //shift
+				//(OP == Sllv) ? 2 :
+				(OP == Lw) ? 3: //load
+				(OP == Sw) ? TMin: //store
+				(OP == Beq)? TMin: //branch
+				(OP == Jal) ? 2 : //jal
+				(OP == Jr_) ? TMin : //jr
+				TMin;
+
 
 endmodule

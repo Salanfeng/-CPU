@@ -31,6 +31,11 @@ module hctrl(
     input EX_RegWrite,
     input MEM_RegWrite,
     input WB_RegWrite,
+    input [3:0] Tuse_rs,
+    input [3:0] Tuse_rt,
+    input [3:0] EX_Tnew,
+    input [3:0] MEM_Tnew,
+    input [3:0] WB_Tnew,
     output npc_stall,
     output IF_stall,
     output ID_clr,
@@ -40,7 +45,8 @@ module hctrl(
     output [1:0] FowardBD
     );
     assign npc_stall = ((EX_MemtoReg) && (ID_Rs == EX_WA || ID_Rt == EX_WA) && EX_WA!=0)|| 
-                       ((MEM_MemtoReg) && (ID_Rs == MEM_WA || ID_Rt == MEM_WA) && MEM_WA!=0);
+                       ((MEM_MemtoReg) && (ID_Rs == MEM_WA || ID_Rt == MEM_WA) && MEM_WA!=0)||
+                       FowardAD == 2'b11 || FowardBD == 2'b11;
     assign IF_stall = npc_stall;
     assign ID_clr = npc_stall;
 
@@ -50,11 +56,11 @@ module hctrl(
     assign FowardBE = (MEM_RegWrite && (EX_Rt == MEM_WA)&& MEM_WA!=0) ? 2'b10 :
                      (WB_RegWrite && (EX_Rt == WB_WA)&& WB_WA !=0) ? 2'b01 :
                      2'b00;
-    assign FowardAD = (EX_RegWrite && (ID_Rs == EX_WA) && EX_WA!=0) ? 2'b11 :
+    assign FowardAD = (EX_RegWrite && (ID_Rs == EX_WA) && EX_WA!=0 && EX_Tnew > Tuse_rs) ? 2'b11 :
                      (MEM_RegWrite && (ID_Rs == MEM_WA)&& MEM_WA!=0) ? 2'b10 :
                      (WB_RegWrite && (ID_Rs == WB_WA) && WB_WA !=0) ? 2'b01 :
                      2'b00;
-    assign FowardBD = (EX_RegWrite && (ID_Rt == EX_WA) && EX_WA!=0) ? 2'b11 :
+    assign FowardBD = (EX_RegWrite && (ID_Rt == EX_WA) && EX_WA!=0 && EX_Tnew > Tuse_rt) ? 2'b11 :
                      (MEM_RegWrite && (ID_Rt == MEM_WA)&& MEM_WA!=0) ? 2'b10 :
                      (WB_RegWrite && (ID_Rt == WB_WA)&& WB_WA !=0) ? 2'b01 :
                      2'b00;
