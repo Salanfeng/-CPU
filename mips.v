@@ -61,6 +61,8 @@
 		wire Jr;
 		wire Allstall;
 		wire [4:0] ALUOp;
+		wire [1:0] LSOp;
+		wire [3:0] MDUOp;
 
 		//grf
 		wire [31:0] NumA;
@@ -77,7 +79,12 @@
 		wire Equal;
 		wire [31:0] ALU_Result;
 
-		reg [3:0] busy;
+		//mdu
+		wire busy;
+		wire start;
+		wire [31:0] HI;
+		wire [31:0] LO;
+		wire [31:0] MDU_Out;
 
 
 
@@ -111,7 +118,7 @@
 			.CLK(clk),
 			.Reset(reset),
 			.PC(next_PC),
-			.npc_stall(npc_stall),
+			.npc_stall(npc_stall||busy),
 			.Now_PC(PC),
 			.Instr(Instr)
 			);
@@ -137,7 +144,7 @@ if (reset) begin
 	ID_PC <= 32'h00003000;
 	ID_Instr <= 32'h00000000;
 end
-else if(!IF_stall)begin
+else if(!IF_stall && !busy)begin
 	if (IF_fluse) begin
 		ID_Instr <= 32'h00000000;
 	end
@@ -167,10 +174,13 @@ assign 	OP = ID_Instr[31:26], Funct = ID_Instr[5:0],
 			.Jump(Jump),
 			.Link(Link),
 			.Jr(Jr),
+			.Start(start),
 			.Tuse_rs(Tuse_rs),
 			.Tuse_rt(Tuse_rt),
 			.Tnew(Tnew),
-			.ALUOp(ALUOp)
+			.ALUOp(ALUOp),
+			.LSOp(LSOp),
+			.MDUOp(MDUOp)
 			);
 
 
@@ -214,6 +224,9 @@ reg [4:0] EX_Rs;
 reg [4:0] EX_Rt;
 reg [4:0] EX_Rd;
 reg [4:0] EX_Shamt;
+reg [1:0] EX_LSOp;
+reg [3:0] EX_MDUOp;
+reg EX_start;
 
 reg EX_ALUSrc;
 reg EX_MemtoReg;
@@ -235,6 +248,9 @@ if (reset || ID_clr) begin
 	EX_RD2 <= 32'h00000000;
 	EX_offset <= 32'h00000000;
 	EX_Shamt <= 5'h00;
+	EX_LSOp <= 0;
+	EX_MDUOp <= 0;
+	EX_start <= 0;
 
 	EX_Rs <= 5'h00;
 	EX_Rt <= 5'h00;
@@ -253,7 +269,7 @@ if (reset || ID_clr) begin
 
 	Allstall_Num <= 0;
 end
-else begin
+else if (!busy) begin
 	EX_PC <= ID_PC;
 	EX_RD1 <= RD1;
 	EX_RD2 <= RD2;
@@ -262,6 +278,9 @@ else begin
 	EX_Rs <= Rs;
 	EX_Rt <= Rt;
 	EX_Rd <= Rd;
+	EX_LSOp <= LSOp;
+	EX_MDUOp <= MDUOp;
+	EX_start <= start;
 	
 	EX_ALUSrc <= ALUSrc;
 	EX_MemtoReg <= MemtoReg;
@@ -278,6 +297,9 @@ else begin
 	Allstall_Num <= Allstall_Num > 0 ? (Allstall_Num - 1) :
 					(OP == 6'b111111) ? 2 : 
 					0;
+end
+else begin
+	EX_start <= 0;
 end
 end
 
@@ -303,12 +325,20 @@ assign 	Shift = EX_ALUSrc ? 5'h10 : EX_Shamt;
 			.ALU_Result(ALU_Result)
 			);
 
-//////////div&mult////////////
-reg [31:0] HI,LO;
-always@(posedge clk) begin
-	if (EX_ALUOp == 0)
-	{HI, LO} <= $signed({HI, LO}) + $signed(A) * $signed(B);
-end
+		mdu _mdu(
+			.clk(clk),
+			.reset(reset),
+			.start(EX_start),
+			.MDUOp(EX_MDUOp), 
+			.A(A),
+			.B(B),
+			.HI(HI),
+			.LO(LO),
+			.MDU_Out(MDU_Out),
+			.busy(busy)
+			);
+
+
 
 assign EX_WA = 	EX_Link ? 5'h1f : 
 				EX_RegDst ? EX_Rd:
@@ -320,7 +350,7 @@ reg [31:0] MEM_PC;
 //reg [31:0] MEM_ALU_Result;
 reg [31:0] MEM_WD;
 reg [4:0] MEM_WA;
-
+reg [1:0] MEM_LSOp;
 reg MEM_MemtoReg;
 reg MEM_RegWrite;
 reg MEM_MemWrite;
@@ -334,6 +364,7 @@ if (reset) begin
 	MEM_ALU_Result <= 32'h00000000;
 	MEM_WD <= 32'h00000000;
 	MEM_WA <= 5'h00;
+	MEM_LSOp <= 0;
 
 	MEM_MemtoReg <= 1'b0;
 	MEM_RegWrite <= 1'b0;
@@ -348,6 +379,7 @@ else begin
 	MEM_ALU_Result <= ALU_Result;
 	MEM_WD <= Bt;
 	MEM_WA <= EX_WA;
+	MEM_LSOp <= EX_LSOp;
 
 	MEM_MemtoReg <= EX_MemtoReg;
 	MEM_RegWrite <= EX_RegWrite;
@@ -361,9 +393,14 @@ end
 
 //////////////Memory (MEM)////////////////
 
+		savebyte _savebyte(
+			.addr(MEM_ALU_Result[1:0]), 
+			.LSOp(MEM_LSOp), 
+			.WD_in(MEM_WD),
+			.byteen(X), 
+			.WD_out(MemData)
+			);
 
-
-assign MemData = MEM_WD;
 
 		dm _dm(
 			.CLK(clk), 
@@ -441,6 +478,8 @@ hctrl _hctrl(
 	.EX_Tnew(EX_Tnew),
 	.MEM_Tnew(MEM_Tnew),
 	.WB_Tnew(WB_Tnew),
+	.Write(MEM_RegWrite),
+	.WB_RegWrite(WB_RegWrite),
 	.npc_stall(npc_stall),
 	.IF_stall(IF_stall),
 	.ID_clr(ID_clr),
@@ -450,5 +489,3 @@ hctrl _hctrl(
 	.FowardBD(FowardBD)
 	);
 
-
-endmodule
