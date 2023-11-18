@@ -48,7 +48,7 @@ end
 		end
 		else begin
 			if (WE && A3!=0) begin
-				$display("%d@%h: $%d <= %h", $time, PC, A3, WD);
+				//$display("%d@%h: $%d <= %h", $time, PC, A3, WD);
 				rf[A3] <= WD;
 			end
 		end

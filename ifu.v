@@ -23,15 +23,12 @@ module ifu(
     input Reset,
     input  [31:0] PC,
 	input npc_stall,
-    output [31:0] Now_PC,
-    output [31:0] Instr
-    );
-    reg [31:0] im [0:4095];
-	 reg [31:0] reg_PC;
-	 wire [31:0] addr;
+    output [31:0] Now_PC
+	);
+	reg [31:0] reg_PC;
+	wire [31:0] addr;
     initial begin
 			reg_PC = 32'h3000;
-			$readmemh("code.txt", im);
     end
 	 
 	always@(posedge CLK) begin
@@ -44,8 +41,5 @@ module ifu(
 	end
 	
 	assign Now_PC = reg_PC;
-	assign addr = reg_PC-32'h3000;
-	assign Instr= im[addr[13:2]];
-	 
 
 endmodule

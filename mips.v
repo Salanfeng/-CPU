@@ -19,10 +19,24 @@
 //
 //////////////////////////////////////////////////////////////////////////////////
 	module mips(
-		 input clk,
-		 input reset
+			input clk,
+			input reset,
+			input [31:0] i_inst_rdata,
+			input [31:0] m_data_rdata,
+			output [31:0] i_inst_addr,
+			output [31:0] m_data_addr,
+			output [31:0] m_data_wdata,
+			output [3 :0] m_data_byteen,
+			output [31:0] m_inst_addr,
+			output w_grf_we,
+			output [4:0] w_grf_addr,
+			output [31:0] w_grf_wdata,
+			output [31:0] w_inst_addr
 	);
 	
+
+
+
 
 	
 	initial begin
@@ -54,7 +68,7 @@
 		wire MemtoReg;
 		wire RegWrite;
 		wire MemWrite;
-		wire Branch;
+		wire [1:0] Branch;
 		wire ExtOp;
 		wire Jump;
 		wire Link;
@@ -86,7 +100,11 @@
 		wire [31:0] LO;
 		wire [31:0] MDU_Out;
 
+		//savebyte
+		wire [3:0] byteen;
 
+		//loadbyte
+		wire [31:0] Load_Out;
 
 		//dm
 		wire [31:0] MemData;
@@ -119,8 +137,7 @@
 			.Reset(reset),
 			.PC(next_PC),
 			.npc_stall(npc_stall||busy),
-			.Now_PC(PC),
-			.Instr(Instr)
+			.Now_PC(PC)
 			);
 
 		npc _npc(
@@ -208,7 +225,7 @@ wire [31:0] RD2 =   //FowardBD == 2'b11 ? ALU_Result :
 					FowardBD == 2'b01 ? RegData :
 					NumB;
 /////CMP/////
-assign PCSrc = ((RD1 == RD2) && Branch) ? 1 : //Branch
+assign PCSrc = (((RD1 == RD2) && (Branch == 1))||((RD1 != RD2) && (Branch == 2))) ? 1 : //Branch
 				Jump ? 2 :
 				Jr ? 3 :
 				0;
@@ -233,7 +250,6 @@ reg EX_MemtoReg;
 reg EX_RegWrite;
 reg EX_RegDst;
 reg EX_MemWrite;
-reg EX_Branch;
 reg EX_Jump;
 reg EX_Link;
 reg EX_Jr;
@@ -260,7 +276,6 @@ if (reset || ID_clr) begin
 	EX_RegWrite <= 0;
 	EX_RegDst <= 0;
 	EX_MemWrite <= 0;
-	EX_Branch <= 0;
 	EX_Jump <= 0;
 	EX_Link <= 0;
 	EX_Jr <= 0;
@@ -287,7 +302,6 @@ else if (!busy) begin
 	EX_RegWrite <= RegWrite;
 	EX_RegDst <= RegDst;
 	EX_MemWrite <= MemWrite;
-	EX_Branch <= Branch;
 	EX_Jump <= Jump;
 	EX_Link <= Link;
 	EX_Jr <= Jr;
@@ -334,7 +348,7 @@ assign 	Shift = EX_ALUSrc ? 5'h10 : EX_Shamt;
 			.B(B),
 			.HI(HI),
 			.LO(LO),
-			.MDU_Out(MDU_Out),
+			.Out(MDU_Out),
 			.busy(busy)
 			);
 
@@ -342,6 +356,7 @@ assign 	Shift = EX_ALUSrc ? 5'h10 : EX_Shamt;
 
 assign EX_WA = 	EX_Link ? 5'h1f : 
 				EX_RegDst ? EX_Rd:
+				EX_start ? MDU_Out:
 				EX_Rt;
 
 //////////////////////////////////////////
@@ -359,7 +374,7 @@ reg MEM_Link;
 reg MEM_Jr;
 reg [3:0] MEM_Tnew;
 always @(posedge clk) begin
-if (reset) begin
+if (reset || busy) begin
 	MEM_PC <= 32'h00003000;
 	MEM_ALU_Result <= 32'h00000000;
 	MEM_WD <= 32'h00000000;
@@ -376,7 +391,7 @@ if (reset) begin
 end
 else begin
 	MEM_PC <= EX_PC;
-	MEM_ALU_Result <= ALU_Result;
+	MEM_ALU_Result <= EX_start ? MDU_Out : ALU_Result;
 	MEM_WD <= Bt;
 	MEM_WA <= EX_WA;
 	MEM_LSOp <= EX_LSOp;
@@ -397,20 +412,28 @@ end
 			.addr(MEM_ALU_Result[1:0]), 
 			.LSOp(MEM_LSOp), 
 			.WD_in(MEM_WD),
-			.byteen(X), 
+			.MemtoReg(MEM_MemtoReg),
+			.byteen(byteen), 
 			.WD_out(MemData)
 			);
 
 
-		dm _dm(
-			.CLK(clk), 
-			.Reset(reset), 
-			.Addr(MEM_ALU_Result[13:2]), 
-			.WD(MemData),
-			.WE(MEM_MemWrite), 
-			.RD(MemOut), 
-			.PC(MEM_PC)
-		);
+		// dm _dm(
+		// 	.CLK(clk), 
+		// 	.Reset(reset), 
+		// 	.Addr(MEM_ALU_Result[13:2]), 
+		// 	.WD(MemData),
+		// 	.WE(MEM_MemWrite), 
+		// 	.RD(MemOut), 
+		// 	.PC(MEM_PC)
+		// );
+
+		loadbyte _loadbyte(
+			.addr(MEM_ALU_Result[1:0]), 
+			.LSOp(MEM_LSOp), 
+			.WD_in(MemOut),
+			.WD_out(Load_Out)
+			);
 
 //////////////////////////////////////////
 //				MEM|WB
@@ -437,10 +460,9 @@ if (reset) begin
 end
 else begin
 	WB_PC <= MEM_PC;
-	WB_MemOut <= MemOut;
+	WB_MemOut <= Load_Out;
 	WB_ALU_Result <= MEM_ALU_Result;
-	WB_WA <= Allstall ? MemOut[4:0] :
-	MEM_WA;
+	WB_WA <= MEM_WA;
 
 	WB_MemtoReg <= MEM_MemtoReg;
 	WB_RegWrite <= MEM_RegWrite;
@@ -478,8 +500,6 @@ hctrl _hctrl(
 	.EX_Tnew(EX_Tnew),
 	.MEM_Tnew(MEM_Tnew),
 	.WB_Tnew(WB_Tnew),
-	.Write(MEM_RegWrite),
-	.WB_RegWrite(WB_RegWrite),
 	.npc_stall(npc_stall),
 	.IF_stall(IF_stall),
 	.ID_clr(ID_clr),
@@ -489,3 +509,19 @@ hctrl _hctrl(
 	.FowardBD(FowardBD)
 	);
 
+
+	//top
+	assign Instr = i_inst_rdata;
+	assign MemOut = m_data_rdata;
+	assign i_inst_addr = PC;
+	assign m_data_addr = MEM_ALU_Result;
+	assign m_data_wdata = MemData;
+	assign m_data_byteen = byteen;
+	assign m_inst_addr = MEM_PC;
+	assign w_grf_we = RW;
+	assign w_grf_addr = A3;
+	assign w_grf_wdata = RegData;
+	assign w_inst_addr = GRF_PC;
+
+
+endmodule

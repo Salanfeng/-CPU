@@ -26,7 +26,7 @@ module cu(
     output MemtoReg,
     output RegWrite,
     output MemWrite,
-    output Branch,
+    output [1:0] Branch,
     output ExtOp,
     output Jump,
     output Link,
@@ -52,26 +52,34 @@ localparam  Add = 6'b100000, Sub = 6'b100010, Jr_ = 6'b001000, Sll = 6'b000000,/
 			Mfhi = 6'b010000, Mflo = 6'b010010, Mthi = 6'b010001, Mtlo = 6'b010011;
 
 //AND Logic
+wire store = OP == Sw || OP == Sh || OP == Sb;
+wire load  = OP == Lw || OP == Lh || OP == Lb;
+wire calc_R = OP == R_type && (Funct != Jr_) && (Funct != Sll);
+wire calc_I = OP == Ori || OP == Lui || OP == Addi || OP == Andi;
+
 assign 	RegDst = (OP == R_type),
-		ALUSrc = (OP == Ori || OP == Lui || OP == Lw || OP == Sw),
-		MemtoReg = (OP == Lw),
-		RegWrite = ((OP == R_type) && (Funct != Jr_) || OP == Ori || OP == Lui || OP ==Jal || OP == Lw),
-		MemWrite = (OP == Sw),
-		Branch = (OP == Beq),
-		ExtOp = (OP == Lw || OP == Sw || OP == Beq),
+		ALUSrc = (OP == Ori || OP == Lui || OP == Addi || OP == Andi || store || load),
+		MemtoReg = load,
+		RegWrite = (MDUOp==0||MDUOp==5||MDUOp==6)&&((OP == R_type) && (Funct != Jr_) || OP ==Jal || OP == Lui || load || calc_I),
+		MemWrite = store,
+		Branch = (OP == Beq) ? 1 :
+				 (OP == Bne) ? 2 :
+				 0,
+		ExtOp = ( OP == Beq || OP == Bne || store || load),
 		Jump = (OP == J || OP == Jal),
 		Link = (OP == Jal),
 		Jr = (OP == R_type) && (Funct == Jr_),
-		ALUOp = (OP == R_type && (Funct == Add)||(Funct == Addi))||(OP == Lw)||(OP == Sw) ? 5'b00000 :
+		ALUOp = (OP == R_type && (Funct == Add)||(OP == Addi))||store||load ? 5'b00000 :
 				(OP == R_type && Funct == Sub) ? 5'b00001 :
-				(OP == R_type && Funct == And) ? 5'b00010 :
-				(OP == R_type && Funct == Or) ? 5'b00011  :
-				(OP == Ori) ? 5'b00011 :
-				(OP == Lui) ? 5'b00110 :
-				(OP == R_type && Funct == Sll) ? 5'b00110 :
+				(OP == R_type && Funct == And)||(OP == Andi) ? 5'b00010 :
+				(OP == R_type && Funct == Or)||(OP == Ori) ? 5'b00011  :
+				(OP == R_type && Funct == Sll)||(OP == Lui) ? 5'b00110 :
+				(OP == R_type && Funct == Slt) ? 5'b01001 :
+				(OP == R_type && Funct == Sltu) ? 5'b01010 :
 				5'b00000;
-assign	LSOp =  (OP == Lh || OP == Sh) ? 1 :
-				(OP == Lb || OP == Sb) ? 2 :
+assign	LSOp =  (OP == Lb || OP == Sb) ? 1 :
+				(OP == Lh || OP == Sh) ? 2 :
+				(OP == Lw || OP == Sw) ? 3 :
 				0;
 assign  MDUOp = (OP == R_type && Funct == Mult) ? 1 :
 				(OP == R_type && Funct == Multu) ? 2 :
@@ -86,32 +94,32 @@ assign Start = MDUOp > 0;
 
 localparam TMax = 5'd15,TMin = 5'd0;
 
-assign Tuse_rs =((OP == R_type)&& (Funct != Jr_) && (Funct != Sll)) ? 1: //calc_R
-				(OP == Ori) || (OP == Lui) ? 1: //calc_I
-				(OP == R_type)&&(Funct == Sll)  ? TMax: //shift  				
+assign Tuse_rs =calc_R ? 1: //calc_R
+				calc_I ? 1: //calc_I
+				(OP == R_type)&&(Funct == Sll)  ? TMax: //shift
 				//(OP == Sllv) ? 1 :
-				(OP == Lw) ? 1: //load
-				(OP == Sw) ? 1: //store
-				(OP == Beq)? 0: //branch
+				load ? 1: //load
+				store ? 1: //store
+				(OP == Beq || OP == Bne)? 0: //branch
 				(OP == J)||(OP == Jal) ? TMax : //jump
 				((OP == R_type) && (Funct == Jr_)) ? 0 : //jr
 				TMax;
-assign Tuse_rt =((OP == R_type)&& (Funct != Jr_) && (Funct != Sll)) ? 1: //calc_R
-				(OP == Ori) || (OP == Lui) ? TMax: //calc_I
+assign Tuse_rt =calc_R ? 1: //calc_R
+				calc_I ? TMax: //calc_I
 				(OP == R_type)&&(Funct == Sll) ? 1: //shift 				
 				//(OP == Sllv) ? 1 :
-				(OP == Lw) ? TMax: //load
-				(OP == Sw) ? 1: //store
-				(OP == Beq)? 0: //branch
+				load ? TMax: //load
+				store ? 1: //store
+				(OP == Beq || OP == Bne)? 0: //branch
 				(OP == J)||(OP == Jal) ? TMax : //jump
 				((OP == R_type) &&( Funct == Jr_)) ? TMax : //jump
 				TMax;
-assign Tnew = 	((OP == R_type)&& (Funct != Jr_))? 2: //calc_R
-				(OP == Ori) || (OP == Lui) ? 2: //calc_I
+assign Tnew = 	calc_R? 2: //calc_R
+				calc_I ? 2: //calc_I
 				//(OP == Sllv) ? 2 :
-				(OP == Lw) ? 3: //load
-				(OP == Sw) ? TMin: //store
-				(OP == Beq)? TMin: //branch
+				load ? 3: //load
+				store ? TMin: //store
+				(OP == Beq || OP == Bne)? TMin: //branch
 				(OP == Jal)? 2 : //jal
 				((OP == R_type) &&( Funct == Jr_)) ? TMin : //jr
 				TMin;

@@ -37,8 +37,8 @@ assign ALU_Result =  (ALUOp == 5'b00000) ? A + B :
 							(ALUOp == 5'b00110) ? B << Shift :
 							(ALUOp == 5'b00111) ? B >> Shift :
 							(ALUOp == 5'b01000) ? s :
-							(ALUOp == 5'b01001) ? {31'b0,($signed(A) > $signed(B))}:
-							(ALUOp == 5'b01010) ? {31'b0,(A > B)}:
+							(ALUOp == 5'b01001) ? {31'b0,($signed(A) < $signed(B))}:
+							(ALUOp == 5'b01010) ? {31'b0,(A < B)}:
 							ALU_Others;
 
 reg [31:0] Cnt;
