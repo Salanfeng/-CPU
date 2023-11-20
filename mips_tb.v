@@ -74,12 +74,12 @@ module mips_tb;
     always @(posedge clk) begin
         if (~reset) begin
             if (w_grf_we && (w_grf_addr != 0)) begin
-                $display("%d@%h: $%d <= %h", $time, w_inst_addr, w_grf_addr, w_grf_wdata);
+                $display("@%h: $%d <= %h", w_inst_addr, w_grf_addr, w_grf_wdata);
             end
         end
         if (reset) for (i = 0; i < 4096; i = i + 1) data[i] <= 0;
         else if (|m_data_byteen) begin
-            $display("%d@%h: *%h <= %h", $time, m_inst_addr, fixed_addr, fixed_wdata);
+            $display("@%h: *%h <= %h", m_inst_addr, fixed_addr, fixed_wdata);
             data[fixed_addr >> 2] <= fixed_wdata;
         end
     end

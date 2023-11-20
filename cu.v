@@ -44,7 +44,7 @@ module cu(
 localparam  R_type = 6'b000000, Ori = 6'b001101, Lw = 6'b100011, Sw = 6'b101011, 
 		    Beq = 6'b000100, Lui = 6'b001111, J = 6'b000010, Jal = 6'b000011,
 			Addi = 6'b001000, Andi = 6'b001100, Lb = 6'b100000, Sb = 6'b101000,
-			Lh = 6'b100001, Sh = 6'b101001, Bne = 6'b000101;
+			Lh = 6'b100001, Sh = 6'b101001, Bne = 6'b000101, Addiu = 6'b001001;
 				
 localparam  Add = 6'b100000, Sub = 6'b100010, Jr_ = 6'b001000, Sll = 6'b000000,//Funct
 			And = 6'b100100, Or = 6'b100101, Slt = 6'b101010, Sltu = 6'b101011,
@@ -55,21 +55,21 @@ localparam  Add = 6'b100000, Sub = 6'b100010, Jr_ = 6'b001000, Sll = 6'b000000,/
 wire store = OP == Sw || OP == Sh || OP == Sb;
 wire load  = OP == Lw || OP == Lh || OP == Lb;
 wire calc_R = OP == R_type && (Funct != Jr_) && (Funct != Sll);
-wire calc_I = OP == Ori || OP == Lui || OP == Addi || OP == Andi;
+wire calc_I = OP == Ori || OP == Lui || OP == Addi || OP == Andi || OP == Addiu;
 
 assign 	RegDst = (OP == R_type),
-		ALUSrc = (OP == Ori || OP == Lui || OP == Addi || OP == Andi || store || load),
+		ALUSrc = (OP == Ori || OP == Lui || OP == Addi ||OP==Addiu|| OP == Andi || store || load),
 		MemtoReg = load,
 		RegWrite = (MDUOp==0||MDUOp==5||MDUOp==6)&&((OP == R_type) && (Funct != Jr_) || OP ==Jal || OP == Lui || load || calc_I),
 		MemWrite = store,
 		Branch = (OP == Beq) ? 1 :
 				 (OP == Bne) ? 2 :
 				 0,
-		ExtOp = ( OP == Beq || OP == Bne || store || load),
+		ExtOp = ( OP == Beq || OP == Bne || store || load || OP == Addi||OP==Addiu),
 		Jump = (OP == J || OP == Jal),
 		Link = (OP == Jal),
 		Jr = (OP == R_type) && (Funct == Jr_),
-		ALUOp = (OP == R_type && (Funct == Add)||(OP == Addi))||store||load ? 5'b00000 :
+		ALUOp = (OP == R_type && (Funct == Add)||(OP == Addi)||(OP == Addiu))||store||load ? 5'b00000 :
 				(OP == R_type && Funct == Sub) ? 5'b00001 :
 				(OP == R_type && Funct == And)||(OP == Andi) ? 5'b00010 :
 				(OP == R_type && Funct == Or)||(OP == Ori) ? 5'b00011  :

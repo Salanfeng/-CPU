@@ -4,6 +4,7 @@ module mdu(
     input reset,
     input start,
 	input [3:0] MDUOp,
+    input [3:0] ID_MDUOp,
 	input [31:0] A,
     input [31:0] B,
     output [31:0] HI,
@@ -15,7 +16,7 @@ reg [31:0] HI_t,LO_t,Out_t,BusyTime;
 assign HI = HI_t;
 assign LO = LO_t;
 assign Out = Out_t;
-assign busy = (BusyTime > 0);
+assign busy = (BusyTime > 0) && (ID_MDUOp > 0);
 always@(posedge clk) begin
     if (reset) begin
         HI_t <= 32'h00000000;

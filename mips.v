@@ -258,7 +258,7 @@ reg [4:0] EX_ALUOp;
 
 reg  [1:0] Allstall_Num;
 always @(posedge clk) begin
-if (reset || ID_clr) begin
+if (reset || ID_clr || busy) begin
 	EX_PC <= 32'h00003000;
 	EX_RD1 <= 32'h00000000;
 	EX_RD2 <= 32'h00000000;
@@ -284,7 +284,7 @@ if (reset || ID_clr) begin
 
 	Allstall_Num <= 0;
 end
-else if (!busy) begin
+else begin
 	EX_PC <= ID_PC;
 	EX_RD1 <= RD1;
 	EX_RD2 <= RD2;
@@ -311,9 +311,6 @@ else if (!busy) begin
 	Allstall_Num <= Allstall_Num > 0 ? (Allstall_Num - 1) :
 					(OP == 6'b111111) ? 2 : 
 					0;
-end
-else begin
-	EX_start <= 0;
 end
 end
 
@@ -344,6 +341,7 @@ assign 	Shift = EX_ALUSrc ? 5'h10 : EX_Shamt;
 			.reset(reset),
 			.start(EX_start),
 			.MDUOp(EX_MDUOp), 
+			.ID_MDUOp(MDUOp),
 			.A(A),
 			.B(B),
 			.HI(HI),
@@ -374,7 +372,7 @@ reg MEM_Link;
 reg MEM_Jr;
 reg [3:0] MEM_Tnew;
 always @(posedge clk) begin
-if (reset || busy) begin
+if (reset) begin
 	MEM_PC <= 32'h00003000;
 	MEM_ALU_Result <= 32'h00000000;
 	MEM_WD <= 32'h00000000;
