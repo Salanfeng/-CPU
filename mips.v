@@ -98,7 +98,7 @@
 		wire [1:0] FowardAD;
 		wire [1:0] FowardBD;
 		wire IF_stall;
-		wire IF_fluse;
+		wire IF_flush;
 		wire npc_stall;
 		wire ID_clr;
 		wire [4:0] EX_WA;
@@ -138,7 +138,7 @@ if (reset) begin
 	ID_Instr <= 32'h00000000;
 end
 else if(!IF_stall)begin
-	if (IF_fluse) begin
+	if (IF_flush) begin
 		ID_Instr <= 32'h00000000;
 	end
 	else begin
@@ -203,7 +203,7 @@ assign PCSrc = ((RD1 == RD2) && Branch) ? 1 : //Branch
 				Jr ? 3 :
 				0;
 
-assign IF_fluse = 0;
+assign IF_flush = 0;
 //////////////////////////////////////////
 //				ID|EX
 reg [31:0] EX_PC;
@@ -276,7 +276,7 @@ else begin
 	EX_ALUOp <= ALUOp;
 
 	Allstall_Num <= Allstall_Num > 0 ? (Allstall_Num - 1) :
-					(OP == 6'b111111) ? 2 : 
+					(OP === 6'b111111) ? 2 : 
 					0;
 end
 end
