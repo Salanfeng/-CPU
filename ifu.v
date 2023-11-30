@@ -25,6 +25,7 @@ module ifu(
 	input npc_stall,
 	input Req,
 	input ID_eret,
+	input [31:0] EPC,
 	output IF_EXC_AdEL,
     output [31:0] Now_PC
 	);
@@ -38,8 +39,11 @@ module ifu(
 	if (Reset) begin
 		reg_PC <= 32'h3000;
 		end
+	else if (ID_eret) begin
+		reg_PC <= EPC;
+	end
 	else if (Req) begin
-		reg_PC <= 0x4180;
+		reg_PC <= 32'h4180;
 	end
 	else if(!npc_stall)begin
 		reg_PC <= PC;

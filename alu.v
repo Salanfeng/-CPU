@@ -19,11 +19,16 @@
 //
 //////////////////////////////////////////////////////////////////////////////////
 module alu(
+	input EXC_load,
+	input EXC_store,
     input [4:0] ALUOp,
     input [31:0] A,
     input [31:0] B,
     input [4:0] Shift,
-    output [31:0] ALU_Result
+    output [31:0] ALU_Result,
+	output EX_EXC_Ov,
+	output EX_EXC_AdEL,
+	output EX_EXC_AdES
 	);
 wire [31:0] s;
 reg [31:0] ALU_Others;
@@ -41,16 +46,25 @@ assign ALU_Result =  (ALUOp == 5'b00000) ? A + B :
 							(ALUOp == 5'b01010) ? {31'b0,(A < B)}:
 							ALU_Others;
 
+//check Ov
+wire [32:0] ext_A = {A[31],A}, ext_B = {B[31],B};
+wire [32:0] ext_add = ext_A + ext_B, ext_sub = ext_A - ext_B; 
+wire Overflow = ((ALUOp == 5'b00000 && ext_add[32] != ext_add[31]) ||
+				(ALUOp == 5'b00001 && ext_sub[32] != ext_sub[31]));
+assign EX_EXC_Ov = !EXC_load && !EXC_store && Overflow;
+assign EX_EXC_AdEL = EXC_load && Overflow;
+assign EX_EXC_AdES = EXC_store && Overflow;
+
 reg [31:0] Cnt;
 reg [31:0] Out;
 integer  i;
 always@(*) begin
-	if (ALUOp == 5'b01100) begin
+	if (ALUOp == 5'b01011) begin
 		//循环左移
 		if(B[4:0] == 5'd0) ALU_Others = A;
 		else ALU_Others = A << B[4:0] | A >> (5'd31 - B[4:0] + 5'd1);
 	end
-	else if (ALUOp == 5'b11111) begin
+	else if (ALUOp == 5'b01100) begin
 		Cnt = 0;
 		Out = 0;
 		for (i = 0;i<32;i=i+1) begin: for_loop
