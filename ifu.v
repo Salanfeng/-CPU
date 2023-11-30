@@ -23,23 +23,30 @@ module ifu(
     input Reset,
     input  [31:0] PC,
 	input npc_stall,
+	input Req,
+	input ID_eret,
+	output IF_EXC_AdEL,
     output [31:0] Now_PC
 	);
 	reg [31:0] reg_PC;
 	wire [31:0] addr;
     initial begin
-			reg_PC = 32'h3000;
+		reg_PC = 32'h3000;
     end
 	 
 	always@(posedge CLK) begin
 	if (Reset) begin
 		reg_PC <= 32'h3000;
 		end
+	else if (Req) begin
+		reg_PC <= 0x4180;
+	end
 	else if(!npc_stall)begin
 		reg_PC <= PC;
 	end
 	end
 	
 	assign Now_PC = reg_PC;
+	assign IF_EXC_AdEL = ((|Now_PC[1:0]) | (Now_PC < 32'h0000_3000) | (Now_PC > 32'h0000_6ffc)) && !ID_eret;
 
 endmodule

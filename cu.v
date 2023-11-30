@@ -41,54 +41,55 @@ module cu(
     );
 
 
-localparam  R_type = 6'b000000, Ori = 6'b001101, Lw = 6'b100011, Sw = 6'b101011, 
-		    Beq = 6'b000100, Lui = 6'b001111, J = 6'b000010, Jal = 6'b000011,
-			Addi = 6'b001000, Andi = 6'b001100, Lb = 6'b100000, Sb = 6'b101000,
-			Lh = 6'b100001, Sh = 6'b101001, Bne = 6'b000101, Addiu = 6'b001001;
-				
-localparam  Add = 6'b100000, Sub = 6'b100010, Jr_ = 6'b001000, Sll = 6'b000000,//Funct
-			And = 6'b100100, Or = 6'b100101, Slt = 6'b101010, Sltu = 6'b101011,
-			Mult = 6'b011000, Multu = 6'b011001, Div = 6'b011010, Divu = 6'b011011,
-			Mfhi = 6'b010000, Mflo = 6'b010010, Mthi = 6'b010001, Mtlo = 6'b010011;
+wire  	R_type= (OP == 6'b000000), Ori= (OP == 6'b001101), Lw= (OP == 6'b100011), Sw= (OP == 6'b101011), 
+		Beq= (OP == 6'b000100), Lui= (OP == 6'b001111), J= (OP == 6'b000010), Jal= (OP == 6'b000011),
+		Addi= (OP == 6'b001000), Andi= (OP == 6'b001100), Lb= (OP == 6'b100000), Sb= (OP == 6'b101000),
+		Lh= (OP == 6'b100001), Sh= (OP == 6'b101001), Bne= (OP == 6'b000101), Addiu= (OP == 6'b001001);
 
-//AND Logic
-wire store = OP == Sw || OP == Sh || OP == Sb;
-wire load  = OP == Lw || OP == Lh || OP == Lb;
-wire calc_R = OP == R_type && (Funct != Jr_) && (Funct != Sll);
-wire calc_I = OP == Ori || OP == Lui || OP == Addi || OP == Andi || OP == Addiu;
+wire	Add = (R_type && Funct == 6'b100000), Sub = (R_type && Funct == 6'b100010), Jr_ = (R_type && Funct == 6'b001000), Sll = (R_type && Funct == 6'b000000),//Funct
+		And = (R_type && Funct == 6'b100100), Or = (R_type && Funct == 6'b100101), Slt = (R_type && Funct == 6'b101010), Sltu = (R_type && Funct == 6'b101011),
+		Mult = (R_type && Funct == 6'b011000), Multu = (R_type && Funct == 6'b011001), Div = (R_type && Funct == 6'b011010), Divu = (R_type && Funct == 6'b011011),
+		Mfhi = (R_type && Funct == 6'b010000), Mflo = (R_type && Funct == 6'b010010), Mthi = (R_type && Funct == 6'b010001), Mtlo = (R_type && Funct == 6'b010011);
 
-assign 	RegDst = (OP == R_type),
-		ALUSrc = (OP == Ori || OP == Lui || OP == Addi ||OP==Addiu|| OP == Andi || store || load),
+
+
+wire store = Sw || Sh || Sb;
+wire load  = Lw || Lh || Lb;
+wire calc_R = R_type && (!Jr_) && (!Sll);
+wire calc_I = Ori || Lui || Addi || Andi || Addiu;
+
+assign 	RegDst = (R_type),
+		ALUSrc = (Ori || Lui || Addi ||Addiu|| Andi || store || load),
 		MemtoReg = load,
-		RegWrite = (MDUOp==0||MDUOp==5||MDUOp==6)&&((OP == R_type) && (Funct != Jr_) || OP ==Jal || OP == Lui || load || calc_I),
+		RegWrite = (MDUOp==0||MDUOp==5||MDUOp==6)&&((R_type) && (!Jr_) || Jal || Lui || load || calc_I),
 		MemWrite = store,
-		Branch = (OP == Beq) ? 1 :
-				 (OP == Bne) ? 2 :
+		Branch = (Beq) ? 1 :
+				 (Bne) ? 2 :
 				 0,
-		ExtOp = ( OP == Beq || OP == Bne || store || load || OP == Addi||OP==Addiu),
-		Jump = (OP == J || OP == Jal),
-		Link = (OP == Jal),
-		Jr = (OP == R_type) && (Funct == Jr_),
-		ALUOp = (OP == R_type && (Funct == Add)||(OP == Addi)||(OP == Addiu))||store||load ? 5'b00000 :
-				(OP == R_type && Funct == Sub) ? 5'b00001 :
-				(OP == R_type && Funct == And)||(OP == Andi) ? 5'b00010 :
-				(OP == R_type && Funct == Or)||(OP == Ori) ? 5'b00011  :
-				(OP == R_type && Funct == Sll)||(OP == Lui) ? 5'b00110 :
-				(OP == R_type && Funct == Slt) ? 5'b01001 :
-				(OP == R_type && Funct == Sltu) ? 5'b01010 :
+		ExtOp = ( Beq || Bne || store || load || Addi||Addiu),
+		Jump = (J || Jal),
+		Link = (Jal),
+		Jr = (R_type) && (Jr_),
+		ALUOp = (Add||Addi||Addiu)||store||load ? 5'b00000 :
+				(Sub) ? 5'b00001 :
+				(And)||(Andi) ? 5'b00010 :
+				(Or)||(Ori) ? 5'b00011  :
+				(Sll)||(Lui) ? 5'b00110 :
+				(Slt) ? 5'b01001 :
+				(Sltu) ? 5'b01010 :
 				5'b00000;
-assign	LSOp =  (OP == Lb || OP == Sb) ? 1 :
-				(OP == Lh || OP == Sh) ? 2 :
-				(OP == Lw || OP == Sw) ? 3 :
+assign	LSOp =  (Lb || Sb) ? 1 :
+				(Lh || Sh) ? 2 :
+				(Lw || Sw) ? 3 :
 				0;
-assign  MDUOp = (OP == R_type && Funct == Mult) ? 1 :
-				(OP == R_type && Funct == Multu) ? 2 :
-				(OP == R_type && Funct == Div) ? 3 :
-				(OP == R_type && Funct == Divu) ? 4 :
-				(OP == R_type && Funct == Mfhi) ? 5 :
-				(OP == R_type && Funct == Mflo) ? 6 :
-				(OP == R_type && Funct == Mthi) ? 7 :
-				(OP == R_type && Funct == Mtlo) ? 8 :
+assign  MDUOp = (Mult) ? 1 :
+				(Multu) ? 2 :
+				(Div) ? 3 :
+				(Divu) ? 4 :
+				(Mfhi) ? 5 :
+				(Mflo) ? 6 :
+				(Mthi) ? 7 :
+				(Mtlo) ? 8 :
 				0;
 assign Start = MDUOp > 0;
 
@@ -96,32 +97,32 @@ localparam TMax = 5'd15,TMin = 5'd0;
 
 assign Tuse_rs =calc_R ? 1: //calc_R
 				calc_I ? 1: //calc_I
-				(OP == R_type)&&(Funct == Sll)  ? TMax: //shift
-				//(OP == Sllv) ? 1 :
+				(R_type)&&(Sll)  ? TMax: //shift
+				//(Sllv) ? 1 :
 				load ? 1: //load
 				store ? 1: //store
-				(OP == Beq || OP == Bne)? 0: //branch
-				(OP == J)||(OP == Jal) ? TMax : //jump
-				((OP == R_type) && (Funct == Jr_)) ? 0 : //jr
+				(Beq || Bne)? 0: //branch
+				(J)||(Jal) ? TMax : //jump
+				((Jr_)) ? 0 : //jr
 				TMax;
 assign Tuse_rt =calc_R ? 1: //calc_R
 				calc_I ? TMax: //calc_I
-				(OP == R_type)&&(Funct == Sll) ? 1: //shift 				
-				//(OP == Sllv) ? 1 :
+				Sll ? 1: //shift 				
+				//(Sllv) ? 1 :
 				load ? TMax: //load
 				store ? 1: //store
-				(OP == Beq || OP == Bne)? 0: //branch
-				(OP == J)||(OP == Jal) ? TMax : //jump
-				((OP == R_type) &&( Funct == Jr_)) ? TMax : //jump
+				(Beq || Bne)? 0: //branch
+				(J)||(Jal) ? TMax : //jump
+				Jr_ ? TMax : //jump
 				TMax;
 assign Tnew = 	calc_R? 2: //calc_R
 				calc_I ? 2: //calc_I
-				//(OP == Sllv) ? 2 :
+				//(Sllv) ? 2 :
 				load ? 3: //load
 				store ? TMin: //store
-				(OP == Beq || OP == Bne)? TMin: //branch
-				(OP == Jal)? 2 : //jal
-				((OP == R_type) &&( Funct == Jr_)) ? TMin : //jr
+				(Beq || Bne)? TMin: //branch
+				(Jal)? 2 : //jal
+				Jr_ ? TMin : //jr
 				TMin;
 
 

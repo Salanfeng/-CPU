@@ -34,17 +34,13 @@
 			output [31:0] w_inst_addr
 	);
 	
-
-
-
-
-	
 	initial begin
 	end
 //declare
 		//ifu
 		wire [31:0] PC;
 		wire [31:0] Instr;
+		wire ID_eret;
 		
 		//spliter
 		wire [5:0] OP, Funct;
@@ -137,6 +133,9 @@
 			.Reset(reset),
 			.PC(next_PC),
 			.npc_stall(npc_stall||busy),
+			.Req(Req),
+			.ID_eret(ID_eret),
+			.IF_EXC_AdEL(IF_EXC_AdEL),
 			.Now_PC(PC)
 			);
 
