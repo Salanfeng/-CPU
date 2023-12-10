@@ -9,7 +9,7 @@
 
 
 module loadbyte(
-    input [1:0] addr,
+    input [31:0] addr,
     input [1:0] LSOp,
     input [31:0] WD_in,
     input MemtoReg,
@@ -31,13 +31,13 @@ always@(*) begin
         end
     end
     else if (LSOp == 2'b01) begin
-        if (addr == 0) begin
+        if (addr[1:0] == 0) begin
             WD_out_t = {{24{WD_in[7]}},WD_in[7:0]};
         end
-        else if (addr == 1) begin
+        else if (addr[1:0] == 1) begin
             WD_out_t = {{24{WD_in[15]}},WD_in[15:8]};
         end
-        else if (addr == 2) begin
+        else if (addr[1:0] == 2) begin
             WD_out_t = {{24{WD_in[23]}},WD_in[23:16]};
         end
         else begin

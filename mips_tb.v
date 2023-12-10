@@ -1,5 +1,6 @@
 `timescale 1ns/1ps
-module mips_tb;
+
+module mips_txt;
 
 	reg clk;
 	reg reset;
@@ -72,14 +73,35 @@ module mips_tb;
 
 	initial begin
 		$readmemh("code.txt", inst);
-        /*40087000
-        21080004
-        40887000
-        42000018*/
-        inst[1120] = 32'h40087000;
-        inst[1121] = 32'h21080004;
-        inst[1122] = 32'h40887000;
-        inst[1123] = 32'h42000018;
+		        /*40087000
+		3c01ffff
+		3421fffc
+		01014024
+		21080004
+		40887000
+		42000018*/
+        // inst[1120] = 32'h40087000;
+        // inst[1121] = 32'h3c01ffff;
+		// inst[1122] = 32'h3421fffc;
+		// inst[1123] = 32'h01014024;
+		// inst[1124] = 32'h21080004;
+		// inst[1125] = 32'h40887000;
+		// inst[1126] = 32'h42000018;
+		/*
+		40087000
+		31083ffc
+		21080004
+		40887000
+		42000018*/
+		/*
+	   inst[1120] = 32'h40087000;
+		inst[1121] = 32'h31083ffc;
+		inst[1122] = 32'h21080004;
+		inst[1123] = 32'h40887000;
+		inst[1124] = 32'h42000018;
+		*/
+		//inst[1124] = 32'h00000d1e;
+		//inst[1125] = 32'h42000018;
 		for (i = 0; i < 5120; i = i + 1) data[i] <= 0;
 	end
 
@@ -108,6 +130,39 @@ module mips_tb;
 		if (~reset) begin
 			if (w_grf_we && (w_grf_addr != 0)) begin
 				$display("%d@%h: $%d <= %h", $time, w_inst_addr, w_grf_addr, w_grf_wdata);
+			end
+		end
+	end
+
+	// ----------- For Interrupt -----------
+
+	wire [31:0] fixed_macroscopic_pc;
+
+	assign fixed_macroscopic_pc = macroscopic_pc & 32'hfffffffc;
+
+	parameter target_pc = 32'h000000000;
+
+	integer count;
+
+	initial begin
+		count = 0;
+	end
+
+	always @(negedge clk) begin
+		if (reset) begin
+			interrupt = 0;
+		end
+		else begin
+			if (interrupt) begin
+				if (|m_int_byteen && (m_int_addr & 32'hfffffffc) == 32'h7f20) begin
+					interrupt = 0;
+				end
+			end
+			else if (fixed_macroscopic_pc == target_pc) begin
+				if (count == 0) begin
+					count = 1;
+					interrupt = 1;
+				end
 			end
 		end
 	end

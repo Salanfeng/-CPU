@@ -43,8 +43,9 @@ module hctrl(
     output [1:0] FowardAD,
     output [1:0] FowardBD
     );
-    assign npc_stall = ((((ID_Rs == EX_WA)||Allstall)&&(EX_Tnew > Tuse_rs)|| ((ID_Rt == EX_WA)||Allstall)&&(EX_Tnew > Tuse_rt)) && EX_WA!=0 && EX_RegWrite)|| 
-                       ((((ID_Rs == MEM_WA)||Allstall)&&(MEM_Tnew > Tuse_rs)|| ((ID_Rt == MEM_WA)||Allstall)&&(MEM_Tnew > Tuse_rt)) && MEM_WA!=0 && MEM_RegWrite);
+    assign npc_stall = ((((ID_Rs == EX_WA )&&(EX_Tnew > Tuse_rs ))|| ((ID_Rt == EX_WA)&&(EX_Tnew > Tuse_rt))) && EX_WA!=0 && EX_RegWrite)|| 
+                       ((((ID_Rs == MEM_WA)&&(MEM_Tnew > Tuse_rs))|| ((ID_Rt == MEM_WA)&&(MEM_Tnew > Tuse_rt))) && MEM_WA!=0 && MEM_RegWrite) ||
+                       Allstall;
     assign IF_stall = npc_stall;
     assign ID_clr = npc_stall;
 

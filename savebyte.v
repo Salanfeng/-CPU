@@ -10,7 +10,7 @@
 
 module savebyte(
     input Req,
-    input [1:0] addr,
+    input [31:0] addr,
     input [1:0] LSOp,
     input [31:0] WD_in,
     input MemtoReg,
@@ -40,15 +40,15 @@ always@(*) begin
         end
     end
     else if (LSOp == 2'b01 && !MemtoReg) begin
-        if (addr == 0) begin
+        if (addr[1:0] == 0) begin
             byteen_t = 4'b0001;
             WD_out_t = {24'b0,WD_in[7:0]};
         end
-        else if (addr == 1) begin
+        else if (addr[1:0] == 1) begin
             byteen_t = 4'b0010;
             WD_out_t = {16'b0,WD_in[7:0],8'b0};
         end
-        else if (addr == 2) begin
+        else if (addr[1:0] == 2) begin
             byteen_t = 4'b0100;
             WD_out_t = {8'b0,WD_in[7:0],16'b0};
         end
@@ -76,7 +76,9 @@ wire ErrOutOfRange = !(((addr >= `StartAddrDM) && (addr <= `EndAddrDM)) ||
 wire ErrTimer = ((addr >= `StartAddrTC0 && addr <= `EndAddrTC0) ||
                 (addr >= `StartAddrTC1 && addr <= `EndAddrTC1)) &&
                 (LSOp != 3);
+wire ErrCount = ((addr >= `StartAddrTC0 + 8 && addr <= `EndAddrTC0)||
+                (addr >= `StartAddrTC1 +8 && addr <= `EndAddrTC1));
 
-assign MEM_EXC_AdES = (LSOp) && !MemtoReg && (ErrAlign || ErrOutOfRange || ErrTimer);
+assign MEM_EXC_AdES = (LSOp) && !MemtoReg && (ErrAlign || ErrOutOfRange || ErrTimer || ErrCount);
 
 endmodule

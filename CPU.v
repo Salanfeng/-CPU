@@ -5,7 +5,6 @@
 // 
 // Create Date:    18:44:55 10/31/2023 
 // Design Name: 
-// Module Name:    mips 
 // Project Name: 
 // Target Devices: 
 // Tool versions: 
@@ -35,12 +34,10 @@
 		output [4:0] GRF_addr,
 		output [31:0] RegData,
 
-		output [31:0] GRF_PC
+		output [31:0] GRF_PC,
+		output IntResponse
 	);
-
-
-
-
+	
 	initial begin
 	end
 //declare
@@ -81,6 +78,7 @@
 		wire [3:0] MDUOp;
 
 		wire Sys;
+		wire Ov_check;
 
 		//grf
 		wire [31:0] NumA;
@@ -114,6 +112,7 @@
 		// wire [31:0] MemData;
 		//mem 
 		reg [31:0] MEM_ALU_Result;
+		reg [31:0] MEM_WD;
 
 		//grf_wb
 		wire [4:0] A3;
@@ -132,6 +131,12 @@
 		wire [4:0] EX_WA;
 
 		//CP0
+		reg [2:0] MEM_CP0_Op;
+		reg [2:0] EX_CP0_Op;
+		reg [4:0] EX_Rd;
+		reg [4:0] MEM_Rd;
+
+
 		wire Req;
 		reg [4:0] ID_EXCCode;
 		reg [4:0] EX_EXCCode;
@@ -147,9 +152,9 @@
 
 		wire DelaySlot;
 		wire [31:0] EPCOut;
+		wire [31:0] EPC_t;
 
 		wire [31:0] CP0Out;
-		//wire [5:0] HWInt;
 
 //module
 //////////////Fetch (IF)//////////////////
@@ -161,11 +166,13 @@
 			.npc_stall(npc_stall||busy),
 			.Req(Req),
 			.ID_eret(ID_eret),
-			.EPC(EPCOut),
+			.EPC(EPC_t),
 			.IF_EXC_AdEL(IF_EXC_AdEL),
 			.Now_PC(PC)
 			);
-
+assign EPC_t =  EX_CP0_Op == 3 && EX_Rd === 14 ? Bt :
+				MEM_CP0_Op == 3 && MEM_Rd === 14 ? MEM_WD :
+				EPCOut;
 		npc _npc(
 			.PC(PC), 
 			.instr_addr(InstrAddr),
@@ -177,7 +184,6 @@
 			.DelaySlot(DelaySlot)
 			);
 
-assign ID_eret = CP0_Op == 1;
 //////////////////////////////////////////
 //				IF|ID
 reg [31:0] ID_PC;
@@ -232,7 +238,8 @@ assign 	OP = ID_Instr[31:26], Funct = ID_Instr[5:0],
 			.MDUOp(MDUOp),
 			.ID_EXC_RI(ID_EXC_RI),
 			.CP0_Op(CP0_Op),
-			.Sys(Sys)
+			.Sys(Sys),
+			.Ov_check(Ov_check)
 			);
 
 
@@ -266,20 +273,22 @@ assign PCSrc = (((RD1 == RD2) && (Branch == 1))||((RD1 != RD2) && (Branch == 2))
 				0;
 
 assign IF_fluse = ID_eret;
+assign ID_eret = CP0_Op == 1;
+
 //////////////////////////////////////////
 //				ID|EX
 reg [31:0] EX_PC;
+reg [31:0] EX_Instr; 
 reg [31:0] EX_RD1;
 reg [31:0] EX_RD2;
 reg [31:0] EX_offset;
 reg [4:0] EX_Rs;
 reg [4:0] EX_Rt;
-reg [4:0] EX_Rd;
 reg [4:0] EX_Shamt;
 reg [1:0] EX_LSOp;
 reg [3:0] EX_MDUOp;
 reg EX_start;
-
+reg EX_Ov_check;
 reg EX_ALUSrc;
 reg EX_MemtoReg;
 reg EX_RegWrite;
@@ -290,13 +299,11 @@ reg EX_Link;
 reg EX_Jr;
 reg [3:0] EX_Tnew;
 reg [4:0] EX_ALUOp;
-reg [2:0] EX_CP0_Op;
-reg  [1:0] Allstall_Num;
 reg EX_DelaySlot;
 always @(posedge clk) begin
 if (reset || ID_clr || busy || Req) begin
-	EX_PC <=!reset ? EX_PC :
-			Req ? 32'h00004180 :
+	EX_PC <=Req ? 32'h00004180 :
+			!reset ? ID_PC :
 			32'h00003000;
 	EX_RD1 <= 32'h00000000;
 	EX_RD2 <= 32'h00000000;
@@ -305,6 +312,7 @@ if (reset || ID_clr || busy || Req) begin
 	EX_LSOp <= 0;
 	EX_MDUOp <= 0;
 	EX_start <= 0;
+	EX_Ov_check <= 0;
 	EX_CP0_Op <= 0;
 	EX_Rs <= 5'h00;
 	EX_Rt <= 5'h00;
@@ -318,14 +326,14 @@ if (reset || ID_clr || busy || Req) begin
 	EX_Link <= 0;
 	EX_Jr <= 0;
 	EX_Tnew <= 0;
-	EX_ALUOp <= 0;
+	EX_ALUOp <= 5'b00000;
 	EX_EXCCode <= 0;
-	Allstall_Num <= 0;
-
-	EX_DelaySlot<= 0;
+	EX_Instr <= 32'h00000000;
+	EX_DelaySlot<= ID_DelaySlot;
 end
 else begin
 	EX_PC <= ID_PC;
+	EX_Instr <= ID_Instr;
 	EX_RD1 <= RD1;
 	EX_RD2 <= RD2;
 	EX_offset <= offset;
@@ -336,6 +344,7 @@ else begin
 	EX_LSOp <= LSOp;
 	EX_MDUOp <= MDUOp;
 	EX_start <= start;
+	EX_Ov_check <= Ov_check;
 	EX_CP0_Op <= CP0_Op;
 
 	EX_ALUSrc <= ALUSrc;
@@ -349,13 +358,9 @@ else begin
 	EX_Tnew <= Tnew > 0 ? Tnew - 1 : 0;
 	EX_ALUOp <= ALUOp;
 	EX_EXCCode <= ID_EXCCode!=0 ? ID_EXCCode :
-				  Sys ? 5'h08 :
-				  ID_EXC_RI ? 5'h10 :
+				  Sys ? 5'd08 :
+				  ID_EXC_RI ? 5'd10 :
 				  0;
-
-	Allstall_Num <= Allstall_Num > 0 ? (Allstall_Num - 1) :
-					(OP == 6'b111111) ? 2 : 
-					0;
 	
 	EX_DelaySlot <= ID_DelaySlot;
 end
@@ -378,6 +383,7 @@ assign 	Shift = EX_ALUSrc ? 5'h10 : EX_Shamt;
 		alu _alu(
 			.EXC_load(EX_MemtoReg),
 			.EXC_store(EX_MemWrite),
+			.Ov_check(EX_Ov_check),
 			.ALUOp(EX_ALUOp), 
 			.A(A),
 			.B(B),
@@ -392,6 +398,7 @@ assign 	Shift = EX_ALUSrc ? 5'h10 : EX_Shamt;
 			.clk(clk),
 			.reset(reset),
 			.start(EX_start),
+			.req(Req),
 			.MDUOp(EX_MDUOp), 
 			.ID_MDUOp(MDUOp),
 			.A(A),
@@ -406,17 +413,16 @@ assign 	Shift = EX_ALUSrc ? 5'h10 : EX_Shamt;
 
 assign EX_WA = 	EX_Link ? 5'h1f : 
 				EX_RegDst ? EX_Rd:
-				EX_start ? MDU_Out:
 				EX_Rt;
 
 //////////////////////////////////////////
 //				EX|MEM
 reg [31:0] MEM_PC;
+reg [31:0] MEM_Instr;
 //reg [31:0] MEM_ALU_Result;
-reg [31:0] MEM_WD;
+// reg [31:0] MEM_WD;
 reg [4:0] MEM_WA;
 reg [1:0] MEM_LSOp;
-reg [4:0] MEM_Rd;
 reg MEM_MemtoReg;
 reg MEM_RegWrite;
 reg MEM_MemWrite;
@@ -425,10 +431,10 @@ reg MEM_Link;
 reg MEM_Jr;
 reg [3:0] MEM_Tnew;
 reg MEM_DelaySlot;
-reg [2:0] MEM_CP0_Op;
 always @(posedge clk) begin
 if (reset || Req) begin
 	MEM_PC <= Req ? 32'h00004180 : 32'h00003000;
+	MEM_Instr <= 32'h00000000;
 	MEM_ALU_Result <= 32'h00000000;
 	MEM_WD <= 32'h00000000;
 	MEM_WA <= 5'h00;
@@ -448,6 +454,7 @@ if (reset || Req) begin
 end
 else begin
 	MEM_PC <= EX_PC;
+	MEM_Instr <= EX_Instr;
 	MEM_ALU_Result <= EX_start ? MDU_Out : ALU_Result;
 	MEM_WD <= Bt;
 	MEM_WA <= EX_WA;
@@ -477,7 +484,7 @@ end
 
 		savebyte _savebyte(
 			.Req(Req),
-			.addr(MEM_ALU_Result[1:0]), 
+			.addr(MEM_ALU_Result), 
 			.LSOp(MEM_LSOp), 
 			.WD_in(MEM_WD),
 			.MemtoReg(MEM_MemtoReg),
@@ -497,7 +504,7 @@ end
 		// );
 
 		loadbyte _loadbyte(
-			.addr(MEM_ALU_Result[1:0]), 
+			.addr(MEM_ALU_Result), 
 			.LSOp(MEM_LSOp), 
 			.WD_in(MemOut),
 			.MemtoReg(MEM_MemtoReg),
@@ -523,12 +530,14 @@ end
 			.HWInt(HWInt),
 			.EXLClr(ID_eret),
 			.EPCOut(EPCOut),
-			.Req(Req)
+			.Req(Req),
+			.IntResponse(IntResponse)
 			);
 
 //////////////////////////////////////////
 //				MEM|WB
 reg [31:0] WB_PC;
+reg [31:0] WB_Instr;
 reg [31:0] WB_MemOut;
 reg [31:0] WB_ALU_Result;
 reg [4:0] WB_WA;
@@ -540,6 +549,7 @@ reg [3:0] WB_Tnew;
 always @(posedge clk) begin
 if (reset || Req) begin
 	WB_PC <=Req ? 32'h00004180 : 32'h00003000;
+	WB_Instr <= 32'h00000000;
 	WB_MemOut <= 32'h00000000;
 	WB_ALU_Result <= 32'h00000000;
 	WB_WA <= 5'h00;
@@ -551,6 +561,7 @@ if (reset || Req) begin
 end
 else begin
 	WB_PC <= MEM_PC;
+	WB_Instr <= MEM_Instr;
 	WB_MemOut <= Load_Out;
 	WB_ALU_Result <= MEM_CP0_Op === 2 ? CP0Out :
 	MEM_ALU_Result;
@@ -573,7 +584,9 @@ assign GRF_PC = WB_PC;
 
 //////////////////////////////////////////
 //Hazard Control
-assign Allstall = Allstall_Num > 0 ? 1 : 0;
+assign Allstall =0;
+//(EX_CP0_Op == 3 && EX_Rd === 14 || MEM_CP0_Op == 3 && MEM_Rd === 14) && ID_eret;
+ // ID_eret && (EX_Instr !=0 || MEM_Instr != 0 || WB_Instr !=0);
 
 hctrl _hctrl(
 	.Allstall(Allstall),

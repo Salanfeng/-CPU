@@ -32,22 +32,19 @@ wire [31:0] MemData;
 wire [3:0] byteen;
 wire [31:0] RegData;
 //TC
-wire [31:2] T0_addr;
-wire [31:2] T1_addr;
 wire T0_WE;
 wire T1_WE;
 wire [31:0] T0_RD;
 wire [31:0] T1_RD;
-wire [31:0] T0_Din;
-wire [31:0] T1_Din;
 wire [31:0] T0_Dout;
 wire [31:0] T1_Dout;
 wire T0_IRQ;
 wire T1_IRQ;
-wire [5:0] HWInt = T0_IRQ | T1_IRQ | interrupt;
+wire [5:0] HWInt = {3'b0,interrupt, T1_IRQ, T0_IRQ};
+wire IntResponse;
 assign macroscopic_pc = m_inst_addr;
-assign m_int_addr = m_data_addr;
-assign m_int_byteen = m_data_byteen;
+assign m_int_addr = IntResponse&&interrupt ? 32'h7F20 : m_data_addr;
+assign m_int_byteen = IntResponse&&interrupt ? 4'b1111 : m_data_byteen;
 CPU cpu(
     .clk(clk),
     .reset(reset),
@@ -63,7 +60,8 @@ CPU cpu(
     .RW(w_grf_we),
     .GRF_addr(w_grf_addr),
     .RegData(w_grf_wdata),
-    .GRF_PC(w_inst_addr)
+    .GRF_PC(w_inst_addr),
+    .IntResponse(IntResponse)
 );
 Bridge bridge(
     .Addr_in(DM_addr),
@@ -85,9 +83,9 @@ Bridge bridge(
 TC t0(
     .clk(clk),
     .reset(reset),
-    .Addr(T0_addr),
+    .Addr(DM_addr[31:2]),
     .WE(T0_WE),
-    .Din(T0_Din),
+    .Din(MemData),
     .Dout(T0_Dout),
     .IRQ(T0_IRQ)
 );
@@ -95,9 +93,9 @@ TC t0(
 TC t1(
     .clk(clk),
     .reset(reset),
-    .Addr(T1_addr),
+    .Addr(DM_addr[31:2]),
     .WE(T1_WE),
-    .Din(T1_Din),
+    .Din(MemData),
     .Dout(T1_Dout),
     .IRQ(T1_IRQ)
 );

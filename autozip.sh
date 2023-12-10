@@ -1,1 +1,1 @@
-zip -r -f mips.zip *.v
+zip -r mips.zip *.v

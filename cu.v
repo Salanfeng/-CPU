@@ -41,7 +41,8 @@ module cu(
 	output [3:0] MDUOp,
 	output ID_EXC_RI,
 	output [2:0] CP0_Op,
-	output Sys
+	output Sys,
+	output Ov_check
     );
 
 
@@ -55,13 +56,10 @@ wire	Add = (R_type && Funct == 6'b100000), Sub = (R_type && Funct == 6'b100010),
 		And = (R_type && Funct == 6'b100100), Or = (R_type && Funct == 6'b100101), Slt = (R_type && Funct == 6'b101010), Sltu = (R_type && Funct == 6'b101011),
 		Mult = (R_type && Funct == 6'b011000), Multu = (R_type && Funct == 6'b011001), Div = (R_type && Funct == 6'b011010), Divu = (R_type && Funct == 6'b011011),
 		Mfhi = (R_type && Funct == 6'b010000), Mflo = (R_type && Funct == 6'b010010), Mthi = (R_type && Funct == 6'b010001), Mtlo = (R_type && Funct == 6'b010011),
-		Syscall = (R_type && Funct == 001100);
+		Syscall = (R_type && Funct == 6'b001100);
 
-wire 	Mfc0 = (COP0 && Rs == 5'b00000), Mtc0 = (COP0 && Rs == 5'b00100), Eret = (COP0 && Funct == 6'b011000);
-assign	CP0_Op =Eret ? 1 :
-				Mfc0 ? 2 :
-				Mtc0 ? 3 :
-				0;
+wire 	Mfc0 = (COP0 && Rs == 5'b00000 && Funct == 6'b000000), Mtc0 = (COP0 && Rs == 5'b00100 && Funct == 6'b000000), Eret = (COP0 && Funct == 6'b011000);
+
 assign Sys = Syscall;
 wire store = Sw || Sh || Sb;
 wire load  = Lw || Lh || Lb;
@@ -87,7 +85,7 @@ assign 	RegDst = (R_type),
 				(Sll)||(Lui) ? 5'b00110 :
 				(Slt) ? 5'b01001 :
 				(Sltu) ? 5'b01010 :
-				5'b11111;
+				5'b00000;
 assign	LSOp =  (Lb || Sb) ? 1 :
 				(Lh || Sh) ? 2 :
 				(Lw || Sw) ? 3 :
@@ -101,8 +99,13 @@ assign  MDUOp = (Mult) ? 1 :
 				(Mthi) ? 7 :
 				(Mtlo) ? 8 :
 				0;
+				
+assign	CP0_Op =Eret ? 1 :
+				Mfc0 ? 2 :
+				Mtc0 ? 3 :
+				0;
 assign Start = MDUOp > 0;
-
+assign Ov_check = (Add || Sub || Addi);
 localparam TMax = 5'd15,TMin = 5'd0;
 
 assign Tuse_rs =calc_R ? 1: //calc_R
@@ -117,7 +120,8 @@ assign Tuse_rs =calc_R ? 1: //calc_R
 				TMax;
 assign Tuse_rt =calc_R ? 1: //calc_R
 				calc_I ? TMax: //calc_I
-				Sll ? 1: //shift 				
+				Sll ? 1: //shift 		
+				Mtc0 ? 1 :
 				//(Sllv) ? 1 :
 				load ? TMax: //load
 				store ? 1: //store
@@ -127,6 +131,7 @@ assign Tuse_rt =calc_R ? 1: //calc_R
 				TMax;
 assign Tnew = 	calc_R? 2: //calc_R
 				calc_I ? 2: //calc_I
+				Mfc0 ? 3 : //mfc0
 				//(Sllv) ? 2 :
 				load ? 3: //load
 				store ? TMin: //store
@@ -136,9 +141,9 @@ assign Tnew = 	calc_R? 2: //calc_R
 				TMin;
 
 
-assign ID_EXC_RI = ! (Ori || Lw || Sw || Beq || Lui || J || Jal || Addi || Andi || Lb || Sb || Lh || Sh || Bne || Addiu ||
+assign ID_EXC_RI = ! (Ori || Lw || Sw || Beq || Lui || J || Jal || Addi || Andi || Lb || Sb || Lh || Sh || Bne ||
 					Add || Sub || Jr_ || Sll || And || Or || Slt || Sltu || Mult || Multu || Div || Divu || Mfhi || Mflo 
-					|| Mthi || Mtlo);
+					|| Mthi || Mtlo || Syscall || Mfc0 || Mtc0 || Eret);
 
 
 endmodule

@@ -3,6 +3,7 @@ module mdu(
     input clk,
     input reset,
     input start,
+    input req,
 	input [3:0] MDUOp,
     input [3:0] ID_MDUOp,
 	input [31:0] A,
@@ -30,7 +31,7 @@ always@(posedge clk) begin
 end
 
 always @(*) begin
-    if (start) begin
+    if (start && !req) begin
         case (MDUOp)
             4'b0001: begin
                 {HI_t, LO_t} = $signed(A) * $signed(B);

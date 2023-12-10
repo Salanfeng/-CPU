@@ -1,2 +1,2 @@
-run 20us;
-exit
+run 200.0us; 
+exit 

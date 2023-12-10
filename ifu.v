@@ -39,14 +39,16 @@ module ifu(
 	if (Reset) begin
 		reg_PC <= 32'h3000;
 		end
-	else if (ID_eret) begin
-		reg_PC <= EPC;
-	end
 	else if (Req) begin
 		reg_PC <= 32'h4180;
 	end
 	else if(!npc_stall)begin
-		reg_PC <= PC;
+		if (ID_eret) begin
+			reg_PC <= EPC;
+		end
+		else begin
+			reg_PC <= PC;
+		end
 	end
 	end
 	

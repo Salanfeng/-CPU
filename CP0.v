@@ -17,8 +17,9 @@ module CP0(
     input [4:0] ExcCodeIn,//记录异常类型
     input [5:0] HWInt,   //输入中断信号
     input EXLClr,
+    output Req,
     output [31:0] EPCOut,
-    output Req
+    output IntResponse
     );
 reg [31:0] SR;   //12
 reg [31:0] Cause;//13
@@ -28,11 +29,11 @@ wire IntReq = (|(HWInt & `IM)) && !`EXL && `IE; // 允许当前中断 且 不在
 wire ExcReq = (|ExcCodeIn) && !`EXL; // 存在异常 且 不在中断中
 assign Req  = IntReq || ExcReq;
 
-wire [31:0] tempEPC = (Req) ? (BDin ? VPC[31:0]-4 : VPC[31:0])
+wire [31:0] tempEPC = (Req) ? (BDin ? VPC[31:0]-32'd4 : VPC[31:0])
                             : EPC;
 
 assign EPCOut = tempEPC;
-
+assign IntResponse = !`EXL && `IE && (HWInt[2] & SR[12]);
 
 always@(posedge clk) begin
     `IP <= HWInt;
@@ -42,12 +43,9 @@ always@(posedge clk) begin
         EPC <= 0;
     end
     else begin
-        if (EXLClr) begin
-            `EXL <= 1'b0;
-        end
+            `EXL <=  Req ? 1 : EXLClr ? 0 : `EXL;
         if (Req) begin
             `ExcCode <= IntReq ? 5'b0 : ExcCodeIn;
-            `EXL <= 1'b1;
             EPC <= tempEPC;
             `BD <= BDin;
         end
@@ -56,11 +54,6 @@ always@(posedge clk) begin
                 12: SR <= CP0In;
                 13: Cause <= CP0In;
                 14: EPC <= CP0In;
-                default: begin
-                    SR <= SR;
-                    Cause <= Cause;
-                    EPC <= EPC;
-                end
             endcase
         end
     end
