@@ -44,7 +44,7 @@
 		//ifu
 		// wire [31:0] PC;
 		wire ID_eret;
-		
+		wire Br_BD;
 		//spliter
 		wire [5:0] OP, Funct;
 		wire [4:0] Rs, Rt, Rd, Shamt;
@@ -176,10 +176,11 @@ assign EPC_t =  EX_CP0_Op == 3 && EX_Rd === 14 ? Bt :
 		npc _npc(
 			.PC(PC), 
 			.instr_addr(InstrAddr),
-			.ra(RD1), 
+			.ra(RD1),
 			.B_PC(B_PC),
 			.PCSrc(PCSrc),
-			.next_PC(next_PC), 
+			.Br_BD(Br_BD),
+			.next_PC(next_PC),
 			.PC_plus4(PC_plus4),
 			.DelaySlot(DelaySlot)
 			);
@@ -271,7 +272,7 @@ assign PCSrc = (((RD1 == RD2) && (Branch == 1))||((RD1 != RD2) && (Branch == 2))
 				Jump ? 2 :
 				Jr ? 3 :
 				0;
-
+assign Br_BD = Branch > 0;
 assign IF_fluse = ID_eret;
 assign ID_eret = CP0_Op == 1;
 

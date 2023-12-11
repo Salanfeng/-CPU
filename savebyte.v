@@ -77,7 +77,7 @@ wire ErrTimer = ((addr >= `StartAddrTC0 && addr <= `EndAddrTC0) ||
                 (addr >= `StartAddrTC1 && addr <= `EndAddrTC1)) &&
                 (LSOp != 3);
 wire ErrCount = ((addr >= `StartAddrTC0 + 8 && addr <= `EndAddrTC0)||
-                (addr >= `StartAddrTC1 +8 && addr <= `EndAddrTC1));
+                (addr >= `StartAddrTC1 + 8 && addr <= `EndAddrTC1));
 
 assign MEM_EXC_AdES = (LSOp) && !MemtoReg && (ErrAlign || ErrOutOfRange || ErrTimer || ErrCount);
 

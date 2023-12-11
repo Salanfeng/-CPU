@@ -73,6 +73,7 @@ module mips_txt;
 
 	initial begin
 		$readmemh("code.txt", inst);
+		//$readmemh("code_handler.txt", inst, 1120, 3046);
 		        /*40087000
 		3c01ffff
 		3421fffc
@@ -116,7 +117,7 @@ module mips_txt;
 		if (m_data_byteen[0]) fixed_wdata[7 : 0] = m_data_wdata[7 : 0];
 	end
 
-	always @(posedge clk) begin
+	always @(negedge clk) begin
 		if (reset) for (i = 0; i < 4096; i = i + 1) data[i] <= 0;
 		else if (|m_data_byteen && fixed_addr >> 2 < 4096) begin
 			data[fixed_addr >> 2] <= fixed_wdata;

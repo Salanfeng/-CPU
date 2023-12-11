@@ -30,7 +30,7 @@ always@(posedge clk) begin
     end
 end
 
-always @(*) begin
+always @(negedge clk) begin
     if (start && !req) begin
         case (MDUOp)
             4'b0001: begin

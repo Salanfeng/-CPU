@@ -5,6 +5,7 @@ module npc(
     input [31:0] ra,
 	input [31:0] B_PC,
 	input [1:0] PCSrc,
+	input Br_BD,
     output [31:0] next_PC,
     output [31:0] PC_plus4,
 	output DelaySlot
@@ -33,7 +34,7 @@ always@(*) begin
 	end
 	else begin
 		tmp_next_PC = PC + 32'h4;
-		t_DS = 0;
+		t_DS = Br_BD;
 	end
 end
 assign DelaySlot = t_DS;
