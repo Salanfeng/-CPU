@@ -1,1 +1,0 @@
--nodebug -prj "mips.prj" -o "mips.exe" "mips_auto_txt" 
